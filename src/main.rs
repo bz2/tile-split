@@ -2,13 +2,17 @@ use tile_split::{Config, tile_image};
 
 // what is main() returning?
 fn main() {
-    println!("Hello, world!");
 
     // read $1
     // read envvars
     // make Config
-    let config = Config { tilesize: 256 };
+    let config = Config {
+        tilesize: 256,
+        filename: "test.png".to_string(),
+        zoomlevel: 5,
+        folder: "out".to_string(),
+    };
 
-    tile_image(config);
+    tile_image(config).unwrap();
     // return result code?
 }
