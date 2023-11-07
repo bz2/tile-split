@@ -1,9 +1,9 @@
-use image; // someway?
+use image::io::Reader as ImageReader;
+use image::GenericImage;
+use crate::{Config, Error};
 
 
-
-
-fn tile_image(config: Config) -> Result<()> {
+pub fn tile_image(config: Config) -> Result<(), Error> {
     let img = ImageReader::open(config.filename)?.decode()?;
 
     let tilesize = config.tilesize;
@@ -15,4 +15,5 @@ fn tile_image(config: Config) -> Result<()> {
             sub.save("0_0_0.png")?;
         }
     }
+    return Ok(());
 }
