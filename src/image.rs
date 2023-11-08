@@ -15,7 +15,7 @@ fn save_view(img: &DynamicImage, x: u32, y: u32, config: &Config) -> Result<(), 
         oxipng::ColorType::RGBA,
         oxipng::BitDepth::Eight,
         sub.to_image().into_raw()
-    )?.create_optimized_png(&oxipng::Options::from_preset(2))?;
+    )?.create_optimized_png(&oxipng::Options::default())?;
     let mut file = File::create(path)?;
     file.write_all(&png)?;
 
