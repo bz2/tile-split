@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::Write;
 use crate::{Config, Error};
+use image::buffer::ConvertBuffer;
 use image::io::Reader as ImageReader;
 use image::{DynamicImage, GenericImageView};
 
@@ -12,9 +13,9 @@ fn save_view(img: &DynamicImage, x: u32, y: u32, config: &Config) -> Result<(), 
     let png = oxipng::RawImage::new(
         config.tilesize,
         config.tilesize,
-        oxipng::ColorType::RGBA,
+        oxipng::ColorType::RGB{ transparent_color: None },
         oxipng::BitDepth::Eight,
-        sub.to_image().into_raw()
+        ConvertBuffer::<image::RgbImage>::convert(&sub.to_image()).into_vec()
     )?.create_optimized_png(&oxipng::Options::from_preset(2))?;
     let mut file = File::create(path)?;
     file.write_all(&png)?;
