@@ -1,5 +1,5 @@
 use crate::{Config, Error};
-use fast_image_resize::{CropBox, Image, PixelType, Resizer, ResizeAlg};
+use fast_image_resize::{change_type_of_pixel_components_dyn, CropBox, Image, PixelType};
 use oxipng::internal_tests::{PngData};
 use std::fs::File;
 use std::io::Write;
@@ -11,9 +11,8 @@ fn save_view(img: &Image, x: u32, y: u32, config: &Config) -> Result<(), Error> 
     let mut view = img.view();
     let size = NonZeroU32::new(config.tilesize).ok_or("zero size")?;
     view.set_crop_box(CropBox {left: x1, top: y1, width: size, height: size})?;
-    let mut sub = Image::new(size, size, view.pixel_type());
-    let mut resizer = Resizer::new(ResizeAlg::default());
-    resizer.resize(&view, &mut sub.view_mut())?;
+    let mut sub = Image::new(size, size, PixelType::U8x4);
+    change_type_of_pixel_components_dyn(&view, &mut sub.view_mut())?;
     let path = format!(
         "{p}/{z}-{x}-{y}.png",
         p = config.folder,
@@ -24,7 +23,7 @@ fn save_view(img: &Image, x: u32, y: u32, config: &Config) -> Result<(), Error> 
     let png = oxipng::RawImage::new(
         config.tilesize,
         config.tilesize,
-        oxipng::ColorType::RGB { transparent_color: None },
+        oxipng::ColorType::RGBA,
         oxipng::BitDepth::Eight,
         sub.into_vec(),
     )?
