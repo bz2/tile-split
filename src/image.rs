@@ -24,7 +24,11 @@ fn save_view(img: &Image, x: u32, y: u32, config: &Config) -> Result<(), Error> 
     let png = oxipng::RawImage::new(
         config.tilesize,
         config.tilesize,
-        oxipng::ColorType::RGB { transparent_color: None },
+        match view.pixel_type() {
+            PixelType::U8x3 => oxipng::ColorType::RGB { transparent_color: None },
+            PixelType::U8x4 => oxipng::ColorType::RGBA,
+            t => return Err(format!("unknown pixel type: {:?}", t).into()),
+        },
         oxipng::BitDepth::Eight,
         sub.into_vec(),
     )?
