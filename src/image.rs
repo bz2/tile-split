@@ -24,7 +24,7 @@ fn save_view(img: &Image, x: u32, y: u32, config: &Config) -> Result<(), Error> 
     let png = oxipng::RawImage::new(
         config.tilesize,
         config.tilesize,
-        oxipng::ColorType::RGBA,
+        oxipng::ColorType::RGB { transparent_color: None },
         oxipng::BitDepth::Eight,
         sub.into_vec(),
     )?
