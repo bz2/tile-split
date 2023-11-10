@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 fast_image_resize = "^2.7.3"
 oxipng = { version="^9.0", default-features=false }
+rayon = "^1.8.0"
 
 [profile.release]
 lto = true

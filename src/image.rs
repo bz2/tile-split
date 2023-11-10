@@ -1,6 +1,7 @@
 use crate::{Config, Error};
 use fast_image_resize::{CropBox, Image, PixelType, Resizer, ResizeAlg};
 use oxipng::internal_tests::{PngData};
+use rayon::prelude::*;
 use std::fs::File;
 use std::io::Write;
 use std::num::NonZeroU32;
@@ -56,11 +57,14 @@ pub fn tile_image(config: Config) -> Result<(), Error> {
         }
     )?;
 
-    // Needs to be a loop, for each possible tile in the image
-    for y in 0..(png.ihdr.height / config.tilesize) {
-        for x in 0..(png.ihdr.width / config.tilesize) {
-            save_view(&img, x, y, &config)?;
+    let max_x = png.ihdr.height / config.tilesize;
+    let max_y = png.ihdr.width / config.tilesize;
+    let mut coords: Vec<(u32, u32)> = Vec::with_capacity((max_x * max_y) as usize);
+    for y in 0..max_y {
+        for x in 0..max_x {
+            coords.push((x, y));
         }
     }
+    coords.par_iter().try_for_each(|&(x, y)| save_view(&img, x, y, &config))?;
     return Ok(());
 }
