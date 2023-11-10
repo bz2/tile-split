@@ -1,24 +1,57 @@
-use image::io::Reader as ImageReader;
+use image::{io::Reader as ImageReader, DynamicImage, SubImage};
 use image::GenericImageView;
 use crate::{Config, Error};
 
-
-fn save_view(img: &image::DynamicImage, x: u32, y: u32, tilesize: u32)  -> Result<(), Error> {
-    let x1 = x * tilesize;
-    let y1 = y * tilesize;
-    let sub = img.view(x1, y1, tilesize, tilesize);
-    sub.to_image().save(format!("0_{x}_{y}.png", x=x, y=y))?;
-    Ok(())
+pub struct TileImage<'c> {
+    pub config: &'c Config<'c>,
 }
 
-pub fn tile_image(config: Config) -> Result<(), Error> {
-    let img = ImageReader::open(config.filename)?.decode()?;
+impl<'c> TileImage<'c> {
+    pub fn create_img(&self) -> Result<DynamicImage, Error> {
+        Ok(ImageReader::open(&self.config.filename)?.decode()?)
+    }
 
-    // Needs to be a loop, for each possible tile in the image
-    for x in 0..3 {
-        for y in 0..2 {
-            save_view(&img, x, y, config.tilesize)?;
+    pub fn iter<'d>(&self, img: &'d DynamicImage) -> TilesIterator<'d> {
+        TilesIterator {
+            img,
+            x_index: 0,
+            y_index: 0,
+            x_max: img.width() / &self.config.tilesize,
+            y_max: img.height() / &self.config.tilesize,
+            tilesize: self.config.tilesize,
         }
     }
-    return Ok(());
+}
+
+pub struct TilesIterator<'d> {
+    img: &'d DynamicImage,
+    x_index: u32,
+    y_index: u32,
+    x_max: u32,
+    y_max: u32,
+    tilesize: u32,
+}
+
+impl<'d> Iterator for TilesIterator<'d> {
+    type Item = (SubImage<&'d DynamicImage>, u32, u32);
+    fn next(&mut self) -> Option<Self::Item> {
+        // reaching the end of slicing, return None
+        if self.x_index == self.x_max - 1 && self.y_index == self.y_max - 1 {
+            None
+        } else {
+            let x1 = self.x_index * self.tilesize;
+            let y1 = self.y_index * self.tilesize;
+            // slice image
+            let result = (self.img.view(x1, y1, self.tilesize, self.tilesize), self.x_index, self.y_index);
+            if self.x_index == self.x_max - 1 {
+                // start with a new row
+                self.x_index = 0;
+                self.y_index += 1;
+            } else  {
+                // move on to the next block in the row
+                self.x_index += 1;
+            }
+            Some(result)
+        }
+    }
 }
