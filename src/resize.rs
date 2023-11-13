@@ -2,10 +2,11 @@ use crate::Config;
 use image::imageops;
 use image::DynamicImage;
 
-pub trait Resizer<'iter, T> {
-    type ItemIterator: Iterator<Item = (T, u8)>;
-
-    fn resize_range<'info>(&'info self, img: &'iter T) -> Self::ItemIterator
+pub trait Resizer<T> {
+    fn resize_range<'info, 'iter>(
+        &'info self,
+        img: &'iter T,
+    ) -> Box<dyn Iterator<Item = (T, u8)> + 'iter>
     where
         'info: 'iter;
 }
@@ -34,10 +35,11 @@ fn _resize(img: &DynamicImage, width: u32, height: u32) -> DynamicImage {
     img.resize(width, height, imageops::FilterType::Lanczos3)
 }
 
-impl<'iter> Resizer<'iter, DynamicImage> for Config<'_> {
-    type ItemIterator = Box<dyn Iterator<Item = ResizedItem> + 'iter>;
-
-    fn resize_range<'info>(&'info self, img: &'iter DynamicImage) -> Self::ItemIterator
+impl Resizer<DynamicImage> for Config<'_> {
+    fn resize_range<'info, 'iter>(
+        &'info self,
+        img: &'iter DynamicImage,
+    ) -> Box<dyn Iterator<Item = ResizedItem> + 'iter>
     where
         'info: 'iter,
     {
