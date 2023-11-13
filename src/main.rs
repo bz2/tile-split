@@ -1,5 +1,8 @@
 use clap::Parser;
 use image::{DynamicImage, ImageResult, SubImage};
+use std::num::ParseIntError;
+use std::ops::RangeInclusive;
+use std::path::PathBuf;
 use tile_split::{Config, Resizer, TileImage};
 
 fn save_subimage(
@@ -9,23 +12,33 @@ fn save_subimage(
     z: u8,
     config: &Config,
 ) -> ImageResult<()> {
-    img.to_image().save(format!(
-        "{p}/{z}-{x}-{y}.{fmt}",
-        p = config.folder,
+    img.to_image().save(config.folder.join(format!(
+        "{z}-{x}-{y}.{fmt}",
         z = z,
         x = x,
         y = y,
         fmt = config.tileformat
-    ))
+    )))
 }
 
 fn save_image(img: &DynamicImage, z: u8, config: &Config) -> ImageResult<()> {
-    img.save(format!(
-        "{p}/{z}.{fmt}",
-        p = config.folder,
-        z = z,
-        fmt = config.tileformat
-    ))
+    img.save(
+        config
+            .folder
+            .join(format!("{z}.{fmt}", z = z, fmt = config.tileformat)),
+    )
+}
+
+fn parse_zoomrange(arg: &str) -> Result<RangeInclusive<u8>, ParseIntError> {
+    match arg
+        .splitn(2, &['-', ' '])
+        .map(str::parse)
+        .collect::<Result<Vec<_>, _>>()?[..]
+    {
+        [a] => Ok(RangeInclusive::new(a, a)),
+        [a, b] => Ok(RangeInclusive::new(a, b)),
+        _ => unreachable!(),
+    }
 }
 
 /// Split input image files into sets of tiles.
@@ -33,30 +46,30 @@ fn save_image(img: &DynamicImage, z: u8, config: &Config) -> ImageResult<()> {
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Input PNG filename.
-    filename: String,
+    filename: PathBuf,
 
-    /// Zoomlevel of input PNG file
+    /// Zoomlevel of input PNG file.
     #[arg(short = 'l', long, env)]
     zoomlevel: u8,
 
-    /// Zoomrange to slice tiles for
-    #[arg(short='r', long, required(false), num_args=1.., value_delimiter = ' ')]
-    zoomrange: Vec<u8>,
+    /// Zoomrange to slice tiles for.
+    #[arg(short='r', long, required(false), value_parser = parse_zoomrange)]
+    zoomrange: RangeInclusive<u8>,
 
     /// Location to write output tiles to.
     #[arg(short, long, env, required(false), default_value("out"))]
-    output_dir: String,
+    output_dir: PathBuf,
 
     /// Dimension of output tiles, in pixels.
-    #[arg(short = 's', long, required(false), default_value("256"))]
+    #[arg(long, required(false), default_value("256"))]
     tilesize: u32,
 
-    /// Type of output tiles, currently unused.
-    #[arg(short = 'f', long, env, required(false), default_value("png"))]
+    /// Type of output tiles.
+    #[arg(long, env, required(false), default_value("png"))]
     tileformat: String,
 
     /// Save the resized files
-    #[arg(long, env, required(false), num_args(0))]
+    #[arg(long, env, action)]
     save_resize: bool,
 }
 
@@ -64,7 +77,7 @@ fn main() {
     let args = Args::parse();
 
     let zomr = if args.zoomrange.is_empty() {
-        vec![args.zoomlevel]
+        args.zoomlevel..=args.zoomlevel
     } else {
         args.zoomrange
     };
@@ -73,7 +86,7 @@ fn main() {
         tilesize: args.tilesize,
         filename: &args.filename,
         zoomlevel: args.zoomlevel,
-        zoomrange: &zomr,
+        zoomrange: zomr,
         folder: &args.output_dir,
         tileformat: &args.tileformat,
     };
@@ -87,19 +100,16 @@ fn main() {
     let image = &tile_image.open_img().unwrap();
 
     // resize (and save)
-    let resizer = Resizer::new(&config);
-    let resized_images = resizer.resize_range(image);
+    let resized_images = config.resize_range(image);
 
     if save_resized {
-        resized_images
-            .iter()
-            .for_each(|(img, z)| save_image(img, *z, &config).unwrap())
+        resized_images.for_each(|(img, z)| save_image(&img, z, &config).unwrap())
+    } else {
+        // save each sliced image
+        resized_images.for_each(|(img, z)| {
+            tile_image
+                .iter(&img)
+                .for_each(|(sub_img, x, y)| save_subimage(&sub_img, x, y, z, &config).unwrap());
+        });
     }
-
-    // save each sliced image
-    resized_images.iter().for_each(|(img, z)| {
-        tile_image
-            .iter(img)
-            .for_each(|(sub_img, x, y)| save_subimage(&sub_img, x, y, *z, &config).unwrap());
-    });
 }
