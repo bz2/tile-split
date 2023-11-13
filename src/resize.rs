@@ -5,10 +5,9 @@ use image::DynamicImage;
 pub trait Resizer<'iter, T> {
     type ItemIterator: Iterator<Item = (T, u8)>;
 
-    fn resize_range<'s, 'i>(&'s self, img: &'i T) -> Self::ItemIterator
+    fn resize_range<'info>(&'info self, img: &'iter T) -> Self::ItemIterator
     where
-        's: 'iter,
-        'i: 'iter;
+        'info: 'iter;
 }
 
 type ResizedItem = (DynamicImage, u8);
@@ -38,10 +37,9 @@ fn _resize(img: &DynamicImage, width: u32, height: u32) -> DynamicImage {
 impl<'iter> Resizer<'iter, DynamicImage> for Config<'_> {
     type ItemIterator = Box<dyn Iterator<Item = ResizedItem> + 'iter>;
 
-    fn resize_range<'s, 'i>(&'s self, img: &'i DynamicImage) -> Self::ItemIterator
+    fn resize_range<'info>(&'info self, img: &'iter DynamicImage) -> Self::ItemIterator
     where
-        's: 'iter,
-        'i: 'iter,
+        'info: 'iter,
     {
         _check_dimension(self, img);
 
