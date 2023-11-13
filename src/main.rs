@@ -1,24 +1,33 @@
+use std::ops::RangeInclusive;
 use clap::Parser;
-use tile_split::{Config, TileImage};
+use tile_split::{Config, Error, TileImage};
+
+fn parse_zoomrange(arg: &str) -> Result<RangeInclusive<u8>, Error> {
+    match arg.splitn(2, &['-', ' ']).map(str::parse).collect::<Result<Vec<_>, _>>()?[..] {
+        [a] => Ok(RangeInclusive::new(a, a)),
+        [a, b] => Ok(RangeInclusive::new(a, b)),
+        _ => unreachable!(),
+    }
+}
 
 /// Split input image files into sets of tiles.
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Input PNG filename.
-    filename: String, 
+    filename: std::path::PathBuf,
 
     /// Zoomlevel of input PNG file
     #[arg(short='l', long, env)]
     zoomlevel: u8,
 
     /// Zoomrange to slice tiles for, currently unused.
-    #[arg(short='r', long, required(false), num_args=1.., value_delimiter = ' ')]
-    zoomrange: Vec<u8>,
+    #[arg(short='r', long, required(false), value_parser = parse_zoomrange)]
+    zoomrange: RangeInclusive<u8>,
 
     /// Location to write output tiles to.
     #[arg(short, long, env, required(false), default_value("out"))]
-    output_dir: String,
+    output_dir: std::path::PathBuf,
 
     /// Dimension of output tiles, in pixels.
     #[arg(short='s', long, required(false), default_value("256"))]
@@ -50,5 +59,5 @@ fn main() {
     };
     // save each sliced image
     // TODO: this is too long and unreadable
-    tile_image.iter(&tile_image.create_img().unwrap()).for_each(|(img, x, y)| img.to_image().save(format!("{p}/{z}_{x}_{y}.png", p=config.folder, z=zoom, x = x, y = y)).unwrap());
+    tile_image.iter(&tile_image.create_img().unwrap()).for_each(|(img, x, y)| img.to_image().save(config.folder.join(format!("{z}_{x}_{y}.png", z=zoom, x = x, y = y))).unwrap());
 }
