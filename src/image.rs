@@ -1,6 +1,6 @@
-use image::{io::Reader as ImageReader, DynamicImage, SubImage};
-use image::GenericImageView;
 use crate::{Config, Error};
+use image::GenericImageView;
+use image::{io::Reader as ImageReader, DynamicImage, SubImage};
 
 pub struct TileImage<'c> {
     pub config: &'c Config<'c>,
@@ -45,12 +45,16 @@ impl<'d> Iterator for TilesIterator<'d> {
             let x1 = self.x_index * self.tilesize;
             let y1 = self.y_index * self.tilesize;
             // slice image
-            let result = (self.img.view(x1, y1, self.tilesize, self.tilesize), self.x_index, self.y_index);
+            let result = (
+                self.img.view(x1, y1, self.tilesize, self.tilesize),
+                self.x_index,
+                self.y_index,
+            );
             if self.x_index == self.x_max - 1 {
                 // start with a new row
                 self.x_index = 0;
                 self.y_index += 1;
-            } else  {
+            } else {
                 // move on to the next block in the row
                 self.x_index += 1;
             }

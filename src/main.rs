@@ -1,26 +1,31 @@
 use clap::Parser;
-use tile_split::{Config, TileImage, Resizer};
-use image::{DynamicImage, SubImage, ImageResult};
+use image::{DynamicImage, ImageResult, SubImage};
+use tile_split::{Config, Resizer, TileImage};
 
-
-fn save_subimage(img: &SubImage<&DynamicImage>, x: u32, y: u32, z: u8, config: &Config) -> ImageResult<()> {
+fn save_subimage(
+    img: &SubImage<&DynamicImage>,
+    x: u32,
+    y: u32,
+    z: u8,
+    config: &Config,
+) -> ImageResult<()> {
     img.to_image().save(format!(
         "{p}/{z}-{x}-{y}.{fmt}",
-        p=config.folder,
-        z=z,
-        x=x,
-        y=y,
-        fmt=config.tileformat)
-    )
+        p = config.folder,
+        z = z,
+        x = x,
+        y = y,
+        fmt = config.tileformat
+    ))
 }
 
 fn save_image(img: &DynamicImage, z: u8, config: &Config) -> ImageResult<()> {
     img.save(format!(
         "{p}/{z}.{fmt}",
-        p=config.folder,
-        z=z,
-        fmt=config.tileformat)
-    )
+        p = config.folder,
+        z = z,
+        fmt = config.tileformat
+    ))
 }
 
 /// Split input image files into sets of tiles.
@@ -28,10 +33,10 @@ fn save_image(img: &DynamicImage, z: u8, config: &Config) -> ImageResult<()> {
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Input PNG filename.
-    filename: String, 
+    filename: String,
 
     /// Zoomlevel of input PNG file
-    #[arg(short='l', long, env)]
+    #[arg(short = 'l', long, env)]
     zoomlevel: u8,
 
     /// Zoomrange to slice tiles for, currently unused.
@@ -43,11 +48,11 @@ struct Args {
     output_dir: String,
 
     /// Dimension of output tiles, in pixels.
-    #[arg(short='s', long, required(false), default_value("256"))]
+    #[arg(short = 's', long, required(false), default_value("256"))]
     tilesize: u32,
 
     /// Type of output tiles, currently unused.
-    #[arg(short='f', long, env, required(false), default_value("png"))]
+    #[arg(short = 'f', long, env, required(false), default_value("png"))]
     tileformat: String,
 
     /// Save the resized files
@@ -58,30 +63,27 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let zomr = if args.zoomrange.len() == 0 {
+    let zomr = if args.zoomrange.is_empty() {
         vec![args.zoomlevel]
-    }
-    else {
+    } else {
         args.zoomrange
     };
 
     let config = Config {
-            tilesize: args.tilesize,
-            filename: &args.filename,
-            zoomlevel: args.zoomlevel,
-            zoomrange: &zomr,
-            folder: &args.output_dir,
-            tileformat: &args.tileformat,
+        tilesize: args.tilesize,
+        filename: &args.filename,
+        zoomlevel: args.zoomlevel,
+        zoomrange: &zomr,
+        folder: &args.output_dir,
+        tileformat: &args.tileformat,
     };
     let save_resized = args.save_resize;
-    
+
     // create output folder
     std::fs::create_dir_all(config.folder).unwrap();
 
     // instantiate TileImage
-    let tile_image = TileImage{
-        config: &config,
-    };
+    let tile_image = TileImage { config: &config };
     let image = &tile_image.open_img().unwrap();
 
     // resize (and save)
@@ -89,7 +91,9 @@ fn main() {
     let resized_images = resizer.resize_range(image);
 
     if save_resized {
-        resized_images.iter().for_each(|(img, z)| save_image(img, *z, &config).unwrap())
+        resized_images
+            .iter()
+            .for_each(|(img, z)| save_image(img, *z, &config).unwrap())
     }
 
     // save each sliced image
