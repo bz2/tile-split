@@ -103,15 +103,13 @@ fn main() {
     let resized_images = config.resize_range(image);
 
     if save_resized {
-        resized_images
-            .iter()
-            .for_each(|(img, z)| save_image(img, *z, &config).unwrap())
+        resized_images.for_each(|(img, z)| save_image(&img, z, &config).unwrap())
+    } else {
+        // save each sliced image
+        resized_images.for_each(|(img, z)| {
+            tile_image
+                .iter(&img)
+                .for_each(|(sub_img, x, y)| save_subimage(&sub_img, x, y, z, &config).unwrap());
+        });
     }
-
-    // save each sliced image
-    resized_images.iter().for_each(|(img, z)| {
-        tile_image
-            .iter(img)
-            .for_each(|(sub_img, x, y)| save_subimage(&sub_img, x, y, *z, &config).unwrap());
-    });
 }

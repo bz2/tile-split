@@ -2,14 +2,19 @@ use crate::Config;
 use image::imageops;
 use image::DynamicImage;
 
-pub trait Resizer<T> {
-    fn resize_range(&self, img: &T) -> Vec<(T, u8)>;
+pub trait Resizer<'iter, T> {
+    type ItemIterator: Iterator<Item = (T, u8)>;
+
+    fn resize_range<'s, 'i>(&'s self, img: &'i T) -> Self::ItemIterator
+    where
+        's: 'iter,
+        'i: 'iter;
 }
 
 type ResizedItem = (DynamicImage, u8);
 
 fn _check_dimension(config: &Config, img: &DynamicImage) {
-    if config.zoomrange.end() > &config.zoomlevel {
+    if *config.zoomrange.end() > config.zoomlevel {
         panic!("Zoom range has value(s) larger than zoom level.");
     }
     let (img_width, img_height) = (img.width(), img.height());
@@ -30,16 +35,19 @@ fn _resize(img: &DynamicImage, width: u32, height: u32) -> DynamicImage {
     img.resize(width, height, imageops::FilterType::Lanczos3)
 }
 
-impl Resizer<DynamicImage> for Config<'_> {
-    fn resize_range(&self, img: &DynamicImage) -> Vec<ResizedItem> {
+impl<'iter> Resizer<'iter, DynamicImage> for Config<'_> {
+    type ItemIterator = Box<dyn Iterator<Item = ResizedItem> + 'iter>;
+
+    fn resize_range<'s, 'i>(&'s self, img: &'i DynamicImage) -> Self::ItemIterator
+    where
+        's: 'iter,
+        'i: 'iter,
+    {
         _check_dimension(self, img);
 
-        self.zoomrange
-            .clone()
-            .map(|x| {
-                let t_size = self.tilesize << x;
-                (_resize(img, t_size, t_size), x)
-            })
-            .collect()
+        Box::new(self.zoomrange.clone().map(|x| {
+            let t_size = self.tilesize << x;
+            (_resize(img, t_size, t_size), x)
+        }))
     }
 }
