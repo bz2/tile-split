@@ -1,8 +1,8 @@
 use std::ops::RangeInclusive;
 use clap::Parser;
-use tile_split::{Config, Error, TileImage};
+use tile_split::{Config, TileImage};
 
-fn parse_zoomrange(arg: &str) -> Result<RangeInclusive<u8>, Error> {
+fn parse_zoomrange(arg: &str) -> Result<RangeInclusive<u8>, std::num::ParseIntError> {
     match arg.splitn(2, &['-', ' ']).map(str::parse).collect::<Result<Vec<_>, _>>()?[..] {
         [a] => Ok(RangeInclusive::new(a, a)),
         [a, b] => Ok(RangeInclusive::new(a, b)),
