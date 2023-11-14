@@ -103,3 +103,6 @@ fn main() {
             .for_each(|(sub_img, x, y)| save_subimage(&sub_img, x, y, *z, &config).unwrap());
     });
 }
+
+#[cfg(test)]
+mod main_tests;
