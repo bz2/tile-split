@@ -5,6 +5,8 @@ use std::ops::RangeInclusive;
 use std::path::PathBuf;
 use tile_split::{Config, Resizer, TileImage};
 
+type PseudoRange<T> = (Option<T>, Option<T>);
+
 fn save_subimage(
     img: &SubImage<&DynamicImage>,
     x: u32,
@@ -29,16 +31,26 @@ fn save_image(img: &DynamicImage, z: u8, config: &Config) -> ImageResult<()> {
     )
 }
 
-fn parse_zoomrange(arg: &str) -> Result<RangeInclusive<u8>, ParseIntError> {
-    match arg
-        .splitn(2, &['-', ' '])
-        .map(str::parse)
-        .collect::<Result<Vec<_>, _>>()?[..]
-    {
-        [a] => Ok(RangeInclusive::new(a, a)),
-        [a, b] => Ok(RangeInclusive::new(a, b)),
-        _ => unreachable!(),
+fn maybe_parse<T: std::str::FromStr>(s: &str) -> Result<Option<T>, T::Err> {
+    if s.is_empty() {
+        Ok(None)
+    } else {
+        str::parse(s).map(Some)
     }
+}
+
+fn parse_zoomrange(arg: &str) -> Result<PseudoRange<u8>, ParseIntError> {
+    Ok(
+        match arg
+            .splitn(2, &['-', ' '])
+            .map(maybe_parse)
+            .collect::<Result<Vec<_>, _>>()?[..]
+        {
+            [a] => (None, a),
+            [a, b] => (a, b),
+            _ => unreachable!(),
+        },
+    )
 }
 
 /// Split input image files into sets of tiles.
@@ -54,7 +66,7 @@ struct Args {
 
     /// Zoomrange to slice tiles for, currently unused.
     #[arg(short='r', long, required(false), value_parser = parse_zoomrange)]
-    zoomrange: RangeInclusive<u8>,
+    zoomrange: PseudoRange<u8>,
 
     /// Location to write output tiles to.
     #[arg(short, long, env, required(false), default_value("out"))]
@@ -73,20 +85,24 @@ struct Args {
     save_resize: bool,
 }
 
+fn derive_range(args: &Args) -> RangeInclusive<u8> {
+    match args.zoomrange {
+        // TODO: Make the default 0..=max perhaps?
+        (None, None) => args.zoomlevel..=args.zoomlevel,
+        (Some(start), None) => start..=args.zoomlevel,
+        (None, Some(end)) => 0..=end,
+        (Some(start), Some(end)) => start..=end,
+    }
+}
+
 fn main() {
     let args = Args::parse();
-
-    let zomr = if args.zoomrange.is_empty() {
-        args.zoomlevel..=args.zoomlevel
-    } else {
-        args.zoomrange
-    };
 
     let config = Config {
         tilesize: args.tilesize,
         filename: &args.filename,
         zoomlevel: args.zoomlevel,
-        zoomrange: zomr,
+        zoomrange: derive_range(&args),
         folder: &args.output_dir,
         tileformat: &args.tileformat,
     };
