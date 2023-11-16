@@ -1,11 +1,24 @@
 use clap::Parser;
 use image::{DynamicImage, ImageResult, SubImage};
-use std::num::ParseIntError;
+use std::cmp::PartialOrd;
 use std::ops::RangeInclusive;
 use std::path::PathBuf;
-use tile_split::{Config, Resizer, TileImage};
+use tile_split::{Config, Error, Resizer, TileImage};
 
 type PseudoRange<T> = (Option<T>, Option<T>);
+
+trait Validate {
+    fn validate(self) -> Result<Self, Error> where Self: Sized;
+}
+
+impl<T: PartialOrd> Validate for PseudoRange<T> {
+    fn validate(self) -> Result<Self, Error> {
+        match self {
+            (Some(a), Some(b)) if a > b => Err("invalid range".into()),
+            _ => Ok(self),
+        }
+    }
+}
 
 fn save_subimage(
     img: &SubImage<&DynamicImage>,
@@ -32,14 +45,13 @@ fn save_image(img: &DynamicImage, z: u8, config: &Config) -> ImageResult<()> {
 }
 
 fn maybe_parse<T: std::str::FromStr>(s: &str) -> Result<Option<T>, T::Err> {
-    if s.is_empty() {
-        Ok(None)
-    } else {
-        str::parse(s).map(Some)
+    match s.is_empty() {
+        true => Ok(None),
+        false => str::parse(s).map(Some),
     }
 }
 
-fn parse_zoomrange(arg: &str) -> Result<PseudoRange<u8>, ParseIntError> {
+fn parse_zoomrange(arg: &str) -> Result<PseudoRange<u8>, Error> {
     Ok(
         match arg
             .splitn(2, &['-', ' '])
@@ -47,7 +59,7 @@ fn parse_zoomrange(arg: &str) -> Result<PseudoRange<u8>, ParseIntError> {
             .collect::<Result<Vec<_>, _>>()?[..]
         {
             [a] => (None, a),
-            [a, b] => (a, b),
+            [a, b] => (a, b).validate()?,
             _ => unreachable!(),
         },
     )
