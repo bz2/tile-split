@@ -1,24 +1,10 @@
 use clap::Parser;
 use image::{DynamicImage, ImageResult, SubImage};
-use std::cmp::PartialOrd;
 use std::ops::RangeInclusive;
 use std::path::PathBuf;
 use tile_split::{Config, Error, Resizer, TileImage};
 
 type PseudoRange<T> = (Option<T>, Option<T>);
-
-trait Validate {
-    fn validate(self) -> Result<Self, Error> where Self: Sized;
-}
-
-impl<T: PartialOrd> Validate for PseudoRange<T> {
-    fn validate(self) -> Result<Self, Error> {
-        match self {
-            (Some(a), Some(b)) if a > b => Err("invalid range".into()),
-            _ => Ok(self),
-        }
-    }
-}
 
 fn save_subimage(
     img: &SubImage<&DynamicImage>,
@@ -58,8 +44,9 @@ fn parse_zoomrange(arg: &str) -> Result<PseudoRange<u8>, Error> {
             .map(maybe_parse)
             .collect::<Result<Vec<_>, _>>()?[..]
         {
-            [a] => (None, a),
-            [a, b] => (a, b).validate()?,
+            [Some(a)] => (None, Some(a)),
+            [Some(a), Some(b)] if a > b => return Err("invalid range".into()),
+            [a, b] => (a, b),
             _ => unreachable!(),
         },
     )
