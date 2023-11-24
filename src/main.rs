@@ -1,8 +1,8 @@
 use clap::Parser;
 use image::{DynamicImage, ImageResult, SubImage};
-use std::num::ParseIntError;
 use std::ops::RangeInclusive;
 use std::path::PathBuf;
+use std::str::FromStr;
 use tile_split::{Config, Resizer, TileImage};
 
 fn save_subimage(
@@ -29,14 +29,15 @@ fn save_image(img: &DynamicImage, z: u8, config: &Config) -> ImageResult<()> {
     )
 }
 
-fn parse_zoomrange(arg: &str) -> Result<RangeInclusive<u8>, ParseIntError> {
-    match arg
-        .splitn(2, &['-', ' '])
-        .map(str::parse)
-        .collect::<Result<Vec<_>, _>>()?[..]
-    {
-        [a] => Ok(RangeInclusive::new(a, a)),
-        [a, b] => Ok(RangeInclusive::new(a, b)),
+fn parse_range<T>(arg: &str) -> Result<RangeInclusive<T>, <T as FromStr>::Err>
+where
+    T: FromStr,
+{
+    let parts: Vec<&str> = arg.splitn(2, &['-', ' ']).collect::<Vec<&str>>();
+
+    match parts.as_slice() {
+        [a] => Ok(RangeInclusive::new(a.parse()?, a.parse()?)),
+        [a, b] => Ok(RangeInclusive::new(a.parse()?, b.parse()?)),
         _ => unreachable!(),
     }
 }
@@ -53,7 +54,7 @@ struct Args {
     zoomlevel: u8,
 
     /// Zoomrange to slice tiles for.
-    #[arg(short='r', long, required(false), value_parser = parse_zoomrange)]
+    #[arg(short='r', long, required(false), value_parser = parse_range::<u8>)]
     zoomrange: RangeInclusive<u8>,
 
     /// Location to write output tiles to.
@@ -67,6 +68,10 @@ struct Args {
     /// Type of output tiles.
     #[arg(long, env, required(false), default_value("png"))]
     tileformat: String,
+
+    /// Subset morton range of tiles to slice.
+    #[arg(short='t', long, required(false), value_parser = parse_range::<u32>)]
+    targetrange: Option<RangeInclusive<u32>>,
 
     /// Save the resized files
     #[arg(long, env, action)]
@@ -89,6 +94,7 @@ fn main() {
         zoomrange: zomr,
         folder: &args.output_dir,
         tileformat: &args.tileformat,
+        targetrange: args.targetrange,
     };
     let save_resized = args.save_resize;
 

@@ -19,12 +19,14 @@ fn args_prompt_help_on_empty() {
 #[should_panic] // known failure, --zoomlevel is required
 fn args_file_only() {
     let args = parse(["bin", "a-file.png"]);
-    assert_eq!(args.filename, "a-file.png");
+    assert_eq!(args.filename.as_path().display().to_string(), "a-file.png");
 }
 
 #[test]
-fn args_file_and_level() {
-    let args = parse(["bin", "-l", "7", "a-file.png"]);
-    assert_eq!(args.filename, "a-file.png");
+fn all_args() {
+    let args = parse(["bin", "-l", "7", "a-file.png", "-r", "0-5", "-t", "0-333"]);
+    assert_eq!(args.filename.as_path().display().to_string(), "a-file.png");
     assert_eq!(args.zoomlevel, 7);
+    assert_eq!(args.zoomrange, 0..=5);
+    assert_eq!(args.targetrange, Some(0..=333));
 }
