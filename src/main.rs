@@ -3,7 +3,7 @@ use image::{DynamicImage, ImageResult, SubImage};
 use std::ops::RangeInclusive;
 use std::path::PathBuf;
 use std::str::FromStr;
-use tile_split::{Config, Resizer, TileImage};
+use tile_split::{Config, Format, Resizer, TileImage};
 
 fn save_subimage(
     img: &SubImage<&DynamicImage>,
@@ -17,7 +17,7 @@ fn save_subimage(
         z = z,
         x = x,
         y = y,
-        fmt = config.tileformat
+        fmt = config.extension()
     )))
 }
 
@@ -25,7 +25,7 @@ fn save_image(img: &DynamicImage, z: u8, config: &Config) -> ImageResult<()> {
     img.save(
         config
             .folder
-            .join(format!("{z}.{fmt}", z = z, fmt = config.tileformat)),
+            .join(format!("{z}.{fmt}", z = z, fmt = config.extension())),
     )
 }
 
@@ -66,8 +66,8 @@ struct Args {
     tilesize: u32,
 
     /// Type of output tiles.
-    #[arg(long, env, required(false), default_value("png"))]
-    tileformat: String,
+    #[arg(long, env, required(false), default_value("png"), value_parser = Format::from_str)]
+    tileformat: Format,
 
     /// Subset morton range of tiles to slice.
     #[arg(short='t', long, required(false), value_parser = parse_range::<u32>)]
@@ -93,7 +93,7 @@ fn main() {
         zoomlevel: args.zoomlevel,
         zoomrange: zomr,
         folder: &args.output_dir,
-        tileformat: &args.tileformat,
+        tileformat: args.tileformat,
         targetrange: args.targetrange,
     };
     let save_resized = args.save_resize;
