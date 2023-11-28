@@ -93,8 +93,8 @@ struct Args {
     tilesize: u32,
 
     /// Type of output tiles.
-    #[arg(long, env, required(false), default_value("png"))]
-    tileformat: String,
+    #[arg(long, env, required(false), default_value("png"), value_parser = Format::from_str)]
+    tileformat: Format,
 
     /// Subset morton range of tiles to slice.
     #[arg(short='t', long, required(false), value_parser = parse_range::<u32>)]
