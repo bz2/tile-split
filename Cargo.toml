@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 image = { version = "^0.24.7", optional = true }
 clap = { version = "^4", features = ["env", "derive"] }
+fast_image_resize = "2.7.3"
 oxipng = { version = "^9.0", features = ["zopfli"], default-features = false }
 rayon = "1.10.0"
 zorder = "0.1.0"
