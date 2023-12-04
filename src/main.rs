@@ -29,15 +29,16 @@ fn save_image(img: &DynamicImage, z: u8, config: &Config) -> ImageResult<()> {
     )
 }
 
-fn parse_range<T>(arg: &str) -> Result<RangeInclusive<T>, <T as FromStr>::Err>
+fn parse_range<Idx>(arg: &str) -> Result<RangeInclusive<Idx>, Idx::Err>
 where
-    T: FromStr,
+    Idx: Copy + FromStr + funty::Integral,
 {
-    let parts: Vec<&str> = arg.splitn(2, &['-', ' ']).collect::<Vec<&str>>();
+    let iter = arg.splitn(2, &['-', ' ']).map(str::parse);
+    let parts = iter.collect::<Result<Vec<_>, _>>()?;
 
-    match parts.as_slice() {
-        [a] => Ok(RangeInclusive::new(a.parse()?, a.parse()?)),
-        [a, b] => Ok(RangeInclusive::new(a.parse()?, b.parse()?)),
+    match parts[..] {
+        [a] => Ok(a..=Idx::MAX),
+        [a, b] => Ok(a..=b),
         _ => unreachable!(),
     }
 }

@@ -1,5 +1,20 @@
 use super::*;
 
+#[test]
+fn arg_parse_range_empty() {
+    // TODO: could support partially open ranges and default to 0-Idx::MAX
+    for s in ["", "  ", "4-", "-4"] {
+        let err = parse_range::<u8>(s).unwrap_err();
+        assert_eq!(err.to_string(), "cannot parse integer from empty string");
+    }
+}
+
+#[test]
+fn arg_parse_range_ok() {
+    assert_eq!(parse_range::<u8>("0").unwrap(), 0..=0);
+    assert_eq!(parse_range::<u8>("3").unwrap(), 3..=3);
+}
+
 /// Parse args and panic on failure but without exiting the process
 fn parse<'a, I>(arr: I) -> Args
 where

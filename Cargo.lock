@@ -617,6 +617,7 @@ name = "tile-split"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "funty",
  "image",
  "oxipng",
  "zorder",
