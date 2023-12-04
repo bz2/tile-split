@@ -1,11 +1,22 @@
 use super::*;
 
 #[test]
-fn arg_parse_range_empty() {
-    // TODO: could support partially open ranges and default to 0-Idx::MAX
-    for s in ["", "  ", "4-", "-4"] {
+fn arg_parse_range_invalud() {
+    for s in ["", "-", " "] {
         let err = parse_range::<u8>(s).unwrap_err();
-        assert_eq!(err.to_string(), "cannot parse integer from empty string");
+        assert_eq!(err.to_string(), "invalid range");
+    }
+    for s in ["  ", " -", "- ", "---"] {
+        let err = parse_range::<u8>(s).unwrap_err();
+        assert_eq!(err.to_string(), "invalid digit found in string");
+    }
+    for s in ["fish", "something bogus"] {
+        let err = parse_range::<u8>(s).unwrap_err();
+        assert_eq!(err.to_string(), "invalid digit found in string");
+    }
+    for s in ["1-0", "55-22"] {
+        let err = parse_range::<u8>(s).unwrap_err();
+        assert_eq!(err.to_string(), "invalid range");
     }
 }
 
@@ -13,6 +24,9 @@ fn arg_parse_range_empty() {
 fn arg_parse_range_ok() {
     assert_eq!(parse_range::<u8>("0").unwrap(), 0..=0);
     assert_eq!(parse_range::<u8>("3").unwrap(), 3..=3);
+    assert_eq!(parse_range::<u8>("-4").unwrap(), 0..=4);
+    assert_eq!(parse_range::<u8>("2-").unwrap(), 2..=255);
+    assert_eq!(parse_range::<u8>("5-5").unwrap(), 5..=5);
 }
 
 /// Parse args and panic on failure but without exiting the process

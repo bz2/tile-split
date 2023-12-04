@@ -3,7 +3,7 @@ use image::{DynamicImage, ImageResult, SubImage};
 use std::ops::RangeInclusive;
 use std::path::PathBuf;
 use std::str::FromStr;
-use tile_split::{Config, Format, Resizer, TileImage};
+use tile_split::{Config, Error, Format, Resizer, TileImage};
 
 fn save_subimage(
     img: &SubImage<&DynamicImage>,
@@ -29,17 +29,26 @@ fn save_image(img: &DynamicImage, z: u8, config: &Config) -> ImageResult<()> {
     )
 }
 
-fn parse_range<Idx>(arg: &str) -> Result<RangeInclusive<Idx>, Idx::Err>
+fn parse_range<Idx>(arg: &str) -> Result<RangeInclusive<Idx>, Error>
 where
-    Idx: Copy + FromStr + funty::Integral,
+    Idx: funty::Integral,
+    Idx::Err: std::error::Error + Send + Sync,
 {
-    let iter = arg.splitn(2, &['-', ' ']).map(str::parse);
+    let iter = arg.splitn(2, &['-', ' ']).map(|s| {
+        if s.is_empty() {
+            Ok(None)
+        } else {
+            s.parse().map(Some)
+        }
+    });
     let parts = iter.collect::<Result<Vec<_>, _>>()?;
 
     match parts[..] {
-        [a] => Ok(a..=Idx::MAX),
-        [a, b] => Ok(a..=b),
-        _ => unreachable!(),
+        [Some(a)] => Ok(a..=a),
+        [Some(a), Some(b)] if a <= b => Ok(a..=b),
+        [Some(a), None] => Ok(a..=Idx::MAX),
+        [None, Some(b)] => Ok(Idx::ZERO..=b),
+        _ => Err("invalid range".into()),
     }
 }
 
