@@ -8,7 +8,10 @@ type ImageInfo = ((u32, u32), Vec<u8>, PixelType);
 
 #[cfg(feature = "image")]
 fn img_load_from_path(path: &Path) -> Result<ImageInfo, Error> {
-    let img = image::io::Reader::open(path)?.decode()?;
+    let reader = image::io::Reader::open(path)?;
+    // Default memory limit may be too small for large images.
+    reader.no_limits();
+    let img = reader.decode()?;
 
     Ok((
         (img.width(), img.height()),
