@@ -21,14 +21,6 @@ fn save_subimage(
     )))
 }
 
-fn save_image(img: &DynamicImage, z: u8, config: &Config) -> ImageResult<()> {
-    img.save(
-        config
-            .folder
-            .join(format!("{z}.{fmt}", z = z, fmt = config.extension())),
-    )
-}
-
 fn parse_range<T>(arg: &str) -> Result<RangeInclusive<T>, <T as FromStr>::Err>
 where
     T: FromStr,
@@ -72,10 +64,6 @@ struct Args {
     /// Subset morton range of tiles to slice.
     #[arg(short='t', long, required(false), value_parser = parse_range::<u32>)]
     targetrange: Option<RangeInclusive<u32>>,
-
-    /// Save the resized files
-    #[arg(long, env, action)]
-    save_resize: bool,
 }
 
 fn main() {
@@ -96,7 +84,6 @@ fn main() {
         tileformat: args.tileformat,
         targetrange: args.targetrange,
     };
-    let save_resized = args.save_resize;
 
     // create output folder
     std::fs::create_dir_all(config.folder).unwrap();
@@ -108,16 +95,12 @@ fn main() {
     // resize (and save)
     let resized_images = config.resize_range(image);
 
-    if save_resized {
-        resized_images.for_each(|(img, z)| save_image(&img, z, &config).unwrap())
-    } else {
-        // save each sliced image
-        resized_images.for_each(|(img, z)| {
-            tile_image
-                .iter(&img)
-                .for_each(|(sub_img, x, y)| save_subimage(&sub_img, x, y, z, &config).unwrap());
-        });
-    }
+    // save each sliced image
+    resized_images.for_each(|(img, z)| {
+        tile_image
+            .iter(&img)
+            .for_each(|(sub_img, x, y)| save_subimage(&sub_img, x, y, z, &config).unwrap());
+    });
 }
 
 #[cfg(test)]
