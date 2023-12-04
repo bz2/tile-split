@@ -6,7 +6,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::{ops::RangeInclusive, path::Path};
-use tile_split::{Config, Error, TileImage};
+use tile_split::{Config, Error, Format, TileImage};
 
 fn save_subimage_oxi(
     sub: &SubImage<&DynamicImage>,
@@ -15,7 +15,7 @@ fn save_subimage_oxi(
     z: u8,
     folder: &Path,
     config: &Config,
-    preset: u8,
+    options: &oxipng::Options,
 ) -> Result<(), Error> {
     let path = folder.join(format!("{z}-{x}-{y}.png", z = z, x = x, y = y));
     let png = oxipng::RawImage::new(
@@ -25,7 +25,7 @@ fn save_subimage_oxi(
         oxipng::BitDepth::Eight,
         sub.to_image().into_raw(),
     )?
-    .create_optimized_png(&oxipng::Options::from_preset(preset))?;
+    .create_optimized_png(options)?;
     let mut file = File::create(path)?;
     file.write_all(&png)?;
 
@@ -38,22 +38,12 @@ fn save_subimage(
     y: &u32,
     z: u8,
     folder: &Path,
-    format: &str,
+    ext: &str,
 ) -> Result<(), Error> {
-    let path = folder.join(format!(
-        "{z}-{x}-{y}.{fmt}",
-        z = z,
-        x = x,
-        y = y,
-        fmt = format
-    ));
+    let path = folder.join(format!("{z}-{x}-{y}.{ext}", z = z, x = x, y = y, ext = ext,));
     sub.to_image().save(path)?;
 
     Ok(())
-}
-
-fn save_image(img: &DynamicImage, z: u8, folder: &Path, tileformat: &str) -> ImageResult<()> {
-    img.save(folder.join(format!("{z}.{fmt}", z = z, fmt = tileformat)))
 }
 
 fn parse_range<T>(arg: &str) -> Result<RangeInclusive<T>, <T as FromStr>::Err>
@@ -99,26 +89,10 @@ struct Args {
     /// Subset morton range of tiles to slice.
     #[arg(short='t', long, required(false), value_parser = parse_range::<u32>)]
     targetrange: Option<RangeInclusive<u32>>,
-
-    /// PNG compression preset.
-    #[arg(long, env, default_value_if("tileformat", "png", "2"), value_parser(clap::value_parser!(u8).range(0..7)))]
-    preset: Option<u8>,
-
-    /// Save the resized files
-    #[arg(long, env, action)]
-    save_resize: bool,
 }
 
 fn main() {
     let args = Args::parse();
-
-    if args.preset.is_some() && &args.tileformat != "png" {
-        eprintln!(
-            "Error: The --preset argument cannot be used with --tileformat set to '{}'",
-            &args.tileformat
-        );
-        std::process::exit(2);
-    }
 
     // create output folder
     std::fs::create_dir_all(&args.output_dir).unwrap();
@@ -129,6 +103,7 @@ fn main() {
         args.zoomlevel,
         args.zoomrange,
         args.targetrange,
+        args.tileformat,
     );
 
     // instantiate and load image
@@ -143,50 +118,39 @@ fn main() {
                 (image.resize(t_size, t_size), x)
             });
 
-    if args.save_resize {
-        resized_images
-            .for_each(|(img, z)| save_image(&img, z, &args.output_dir, &args.tileformat).unwrap())
-    } else {
-        // save each sliced image
-        resized_images.for_each(|(img, z)| {
-            let mut targetrangetoslice: Option<RangeInclusive<u32>> = None;
-            // if startzoomrangetoslice is the same as endzoomrangetoslice,
-            // then tiles to be sliced in this function are from same zoom level
-            if config.startzoomrangetoslice == config.endzoomrangetoslice {
-                if z == config.endzoomrangetoslice {
-                    targetrangetoslice = Some(config.starttargetrange..=config.endtargetrange);
-                }
-            // otherwise, the start zoom level should slice tiles from starttargetrange to end,
-            // the end zoom level should slice tiles from 0 to endtargetrange
-            } else if z == config.startzoomrangetoslice {
-                if 1 << (z * 2) > 1 {
-                    targetrangetoslice = Some(config.starttargetrange..=(1 << (z * 2)) - 1);
-                }
-            } else if z == config.endzoomrangetoslice {
-                targetrangetoslice = Some(0..=config.endtargetrange);
+    // save each sliced image
+    resized_images.for_each(|(img, z)| {
+        let mut targetrangetoslice: Option<RangeInclusive<u32>> = None;
+        // if startzoomrangetoslice is the same as endzoomrangetoslice,
+        // then tiles to be sliced in this function are from same zoom level
+        if config.startzoomrangetoslice == config.endzoomrangetoslice {
+            if z == config.endzoomrangetoslice {
+                targetrangetoslice = Some(config.starttargetrange..=config.endtargetrange);
             }
-            image
-                .iter_tiles(&img, targetrangetoslice)
-                .collect::<Vec<(SubImage<&DynamicImage>, u32, u32)>>()
-                .par_iter()
-                .for_each(|(sub_img, x, y)| {
-                    if &args.tileformat == "png" {
-                        save_subimage_oxi(
-                            sub_img,
-                            x,
-                            y,
-                            z,
-                            &args.output_dir,
-                            &config,
-                            args.preset.unwrap(),
-                        )
-                        .unwrap()
-                    } else {
-                        save_subimage(sub_img, x, y, z, &args.output_dir, &args.tileformat).unwrap()
+        // otherwise, the start zoom level should slice tiles from starttargetrange to end,
+        // the end zoom level should slice tiles from 0 to endtargetrange
+        } else if z == config.startzoomrangetoslice {
+            if 1 << (z * 2) > 1 {
+                targetrangetoslice = Some(config.starttargetrange..=(1 << (z * 2)) - 1);
+            }
+        } else if z == config.endzoomrangetoslice {
+            targetrangetoslice = Some(0..=config.endtargetrange);
+        }
+        image
+            .iter_tiles(&img, targetrangetoslice)
+            .collect::<Vec<(SubImage<&DynamicImage>, u32, u32)>>()
+            .par_iter()
+            .for_each(|(sub_img, x, y)| {
+                // TODO: fix use-after-move for tileformat, can't copy options?
+                match &args.tileformat {
+                    Format::OxiPng(opts) => {
+                        save_subimage_oxi(sub_img, x, y, z, &args.output_dir, &config, &opts)
                     }
-                });
-        });
-    }
+                    _ => save_subimage(sub_img, x, y, z, &args.output_dir, config.extension()),
+                }
+                .unwrap() // TODO: propogate error
+            });
+    });
 }
 
 #[cfg(test)]

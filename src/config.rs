@@ -36,7 +36,7 @@ pub struct Config<'a> {
     pub endzoomrangetoslice: u8,
     pub starttargetrange: u32,
     pub endtargetrange: u32,
-    pub tileformat: Format,                       // png
+    pub tileformat: Format, // png
 }
 
 impl<'a> Config<'a> {
@@ -46,6 +46,7 @@ impl<'a> Config<'a> {
         zoomlevel: u8,                            // eg 5
         zoomrange: Option<RangeInclusive<u8>>,    // eg 0 - 5
         targetrange: Option<RangeInclusive<u32>>, //eg 0 - 500
+        tileformat: Format,
     ) -> Self {
         let zomr = zoomrange.unwrap_or(zoomlevel..=zoomlevel);
         // total number of tiles required in zoomrange
@@ -112,7 +113,7 @@ impl<'a> Config<'a> {
             endzoomrangetoslice,
             starttargetrange,
             endtargetrange,
-            // TODO: tileformat
+            tileformat,
         }
     }
 }
