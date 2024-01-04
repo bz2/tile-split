@@ -1,3 +1,5 @@
+use std::ops::RangeInclusive;
+
 use crate::Config;
 use image::imageops;
 use image::DynamicImage;
@@ -11,7 +13,7 @@ pub trait Resizer<'iter, T> {
 type ResizedItem = (DynamicImage, u8);
 
 fn _check_dimension(config: &Config, img: &DynamicImage) {
-    if *config.zoomrange.end() > config.zoomlevel {
+    if config.endzoomrangetoslice > config.zoomlevel {
         panic!("Zoom range has value(s) larger than zoom level.");
     }
     let (img_width, img_height) = (img.width(), img.height());
@@ -38,9 +40,11 @@ impl<'iter> Resizer<'iter, DynamicImage> for Config<'_> {
     fn resize_range(&'iter self, img: &'iter DynamicImage) -> Self::ItemIterator {
         _check_dimension(self, img);
 
-        Box::new(self.zoomrange.clone().map(|x| {
-            let t_size = self.tilesize << x;
-            (_resize(img, t_size, t_size), x)
-        }))
+        Box::new(
+            RangeInclusive::new(self.startzoomrangetoslice, self.endzoomrangetoslice).map(|x| {
+                let t_size = self.tilesize << x;
+                (_resize(img, t_size, t_size), x)
+            }),
+        )
     }
 }

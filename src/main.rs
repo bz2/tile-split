@@ -1,8 +1,8 @@
 use clap::Parser;
 use image::{DynamicImage, ImageResult, SubImage};
-use std::ops::RangeInclusive;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::{ops::RangeInclusive, path::Path};
 use tile_split::{Config, Resizer, TileImage};
 
 fn save_subimage(
@@ -10,23 +10,20 @@ fn save_subimage(
     x: u32,
     y: u32,
     z: u8,
-    config: &Config,
+    folder: &Path,
+    tileformat: &str,
 ) -> ImageResult<()> {
-    img.to_image().save(config.folder.join(format!(
+    img.to_image().save(folder.join(format!(
         "{z}-{x}-{y}.{fmt}",
         z = z,
         x = x,
         y = y,
-        fmt = config.tileformat
+        fmt = tileformat
     )))
 }
 
-fn save_image(img: &DynamicImage, z: u8, config: &Config) -> ImageResult<()> {
-    img.save(
-        config
-            .folder
-            .join(format!("{z}.{fmt}", z = z, fmt = config.tileformat)),
-    )
+fn save_image(img: &DynamicImage, z: u8, folder: &Path, tileformat: &str) -> ImageResult<()> {
+    img.save(folder.join(format!("{z}.{fmt}", z = z, fmt = tileformat)))
 }
 
 fn parse_range<T>(arg: &str) -> Result<RangeInclusive<T>, <T as FromStr>::Err>
@@ -81,25 +78,18 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let zomr = if args.zoomrange.is_empty() {
-        args.zoomlevel..=args.zoomlevel
-    } else {
-        args.zoomrange
-    };
-
-    let config = Config {
-        tilesize: args.tilesize,
-        filename: &args.filename,
-        zoomlevel: args.zoomlevel,
-        zoomrange: zomr,
-        folder: &args.output_dir,
-        tileformat: &args.tileformat,
-        targetrange: args.targetrange,
-    };
     let save_resized = args.save_resize;
 
     // create output folder
-    std::fs::create_dir_all(config.folder).unwrap();
+    std::fs::create_dir_all(&args.output_dir).unwrap();
+
+    let config = Config::new(
+        &args.filename,
+        args.tilesize,
+        args.zoomlevel,
+        args.zoomrange,
+        args.targetrange,
+    );
 
     // instantiate TileImage
     let tile_image = TileImage { config: &config };
@@ -109,13 +99,32 @@ fn main() {
     let resized_images = config.resize_range(image);
 
     if save_resized {
-        resized_images.for_each(|(img, z)| save_image(&img, z, &config).unwrap())
+        resized_images
+            .for_each(|(img, z)| save_image(&img, z, &args.output_dir, &args.tileformat).unwrap())
     } else {
         // save each sliced image
         resized_images.for_each(|(img, z)| {
+            let mut targetrangetoslice: Option<RangeInclusive<u32>> = None;
+            // if startzoomrangetoslice is the same as endzoomrangetoslice,
+            // then tiles to be sliced in this function are from same zoom level
+            if config.startzoomrangetoslice == config.endzoomrangetoslice {
+                if z == config.endzoomrangetoslice {
+                    targetrangetoslice = Some(config.starttargetrange..=config.endtargetrange);
+                }
+            // otherwise, the start zoom level should slice tiles from starttargetrange to end,
+            // the end zoom level should slice tiles from 0 to endtargetrange
+            } else if z == config.startzoomrangetoslice {
+                if 1 << (z * 2) > 1 {
+                    targetrangetoslice = Some(config.starttargetrange..=(1 << (z * 2)) - 1);
+                }
+            } else if z == config.endzoomrangetoslice {
+                targetrangetoslice = Some(0..=config.endtargetrange);
+            }
             tile_image
-                .iter(&img)
-                .for_each(|(sub_img, x, y)| save_subimage(&sub_img, x, y, z, &config).unwrap());
+                .iter(&img, targetrangetoslice)
+                .for_each(|(sub_img, x, y)| {
+                    save_subimage(&sub_img, x, y, z, &args.output_dir, &args.tileformat).unwrap()
+                });
         });
     }
 }

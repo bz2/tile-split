@@ -26,7 +26,15 @@ We can also optionally take a PNG for a high zoom level, downsize it to create P
 
     tile-split level-5.png --zoomlevel 5 --zoomrange 2-5 --targetrange 0-44
 
-This would generate tiles for zoomlevels 2, 3, 4 and 5 from the single level 5 PNG and slice a subset of 45 tiles for each level.
+This would generate tiles for zoomlevels 2, 3, 4 and 5 from the single level 5 PNG and slice the first subset of 45 tiles for the whole zoom range.
+
+For example, for a chunk size of 300 tiles per round, the arguments would be
+
+    tile-split level-5.png --zoomlevel 5 --zoomrange 0-5 --targetrange 0-300
+    tile-split level-5.png --zoomlevel 5 --zoomrange 0-5 --targetrange 300-600
+    tile-split level-5.png --zoomlevel 5 --zoomrange 0-5 --targetrange 600-900
+    tile-split level-5.png --zoomlevel 5 --zoomrange 0-5 --targetrange 900-1200
+    tile-split level-5.png --zoomlevel 5 --zoomrange 0-5 --targetrange 1200-1365
 
 Note that we cannot upscale an input PNG to higher zoomlevels, only downscale -- so all zoomlevels passed via `--zoomrange` must be equal to or less than the input PNG zoomlevel passed via `--zoomlevel`.
 
