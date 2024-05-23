@@ -1,25 +1,33 @@
 use clap::Parser;
 use image::{DynamicImage, ImageResult, SubImage};
+use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::{ops::RangeInclusive, path::Path};
-use tile_split::{Config, Resizer, TileImage};
+use tile_split::{Config, Error, Resizer, TileImage};
 
 fn save_subimage(
-    img: &SubImage<&DynamicImage>,
+    sub: &SubImage<&DynamicImage>,
     x: u32,
     y: u32,
     z: u8,
     folder: &Path,
-    tileformat: &str,
-) -> ImageResult<()> {
-    img.to_image().save(folder.join(format!(
-        "{z}-{x}-{y}.{fmt}",
-        z = z,
-        x = x,
-        y = y,
-        fmt = tileformat
-    )))
+    config: &Config,
+) -> Result<(), Error> {
+    let path = folder.join(format!("{z}-{x}-{y}.png", z = z, x = x, y = y));
+    let png = oxipng::RawImage::new(
+        config.tilesize,
+        config.tilesize,
+        oxipng::ColorType::RGBA,
+        oxipng::BitDepth::Eight,
+        sub.to_image().into_raw(),
+    )?
+    .create_optimized_png(&oxipng::Options::from_preset(2))?;
+    let mut file = File::create(path)?;
+    file.write_all(&png)?;
+
+    Ok(())
 }
 
 fn save_image(img: &DynamicImage, z: u8, folder: &Path, tileformat: &str) -> ImageResult<()> {
@@ -123,7 +131,7 @@ fn main() {
             tile_image
                 .iter(&img, targetrangetoslice)
                 .for_each(|(sub_img, x, y)| {
-                    save_subimage(&sub_img, x, y, z, &args.output_dir, &args.tileformat).unwrap()
+                    save_subimage(&sub_img, x, y, z, &args.output_dir, &config).unwrap()
                 });
         });
     }
