@@ -1,20 +1,19 @@
 use crate::{Config, Error};
-use fast_image_resize::{CropBox, Image, PixelType, Resizer, ResizeAlg};
+use fast_image_resize::{PixelType, Resizer};
+use fast_image_resize::images::{CroppedImage, Image};
 use oxipng::internal_tests::{PngData};
 use rayon::prelude::*;
 use std::fs::File;
 use std::io::Write;
-use std::num::NonZeroU32;
 
 fn save_view(img: &Image, x: u32, y: u32, config: &Config) -> Result<(), Error> {
     let x1 = x * config.tilesize;
     let y1 = y * config.tilesize;
-    let mut view = img.view();
-    let size = NonZeroU32::new(config.tilesize).ok_or("zero size")?;
-    view.set_crop_box(CropBox {left: x1, top: y1, width: size, height: size})?;
-    let mut sub = Image::new(size, size, view.pixel_type());
-    let mut resizer = Resizer::new(ResizeAlg::default());
-    resizer.resize(&view, &mut sub.view_mut())?;
+    let size = config.tilesize;
+    let view = CroppedImage::new(img, x1, y1, size, size)?; 
+    let mut sub = Image::new(size, size, img.pixel_type());
+    let mut resizer = Resizer::new();
+    resizer.resize(&view, &mut sub, None)?;
     let path = format!(
         "{p}/{z}-{x}-{y}.png",
         p = config.folder,
@@ -25,7 +24,7 @@ fn save_view(img: &Image, x: u32, y: u32, config: &Config) -> Result<(), Error> 
     let png = oxipng::RawImage::new(
         config.tilesize,
         config.tilesize,
-        match view.pixel_type() {
+        match img.pixel_type() {
             PixelType::U8x3 => oxipng::ColorType::RGB { transparent_color: None },
             PixelType::U8x4 => oxipng::ColorType::RGBA,
             t => return Err(format!("unknown pixel type: {:?}", t).into()),
@@ -46,9 +45,9 @@ fn save_view(img: &Image, x: u32, y: u32, config: &Config) -> Result<(), Error> 
 pub fn tile_image(config: Config) -> Result<(), Error> {
     let png = std::sync::Arc::into_inner(PngData::new(std::path::Path::new(config.filename), &oxipng::Options::default() )?.raw).unwrap();
 
-    let img = fast_image_resize::Image::from_vec_u8(
-        NonZeroU32::new(png.ihdr.width).ok_or("zero width")?,
-        NonZeroU32::new(png.ihdr.height).ok_or("zero height")?,
+    let img = Image::from_vec_u8(
+        png.ihdr.width,
+        png.ihdr.height,
         png.data,
         match png.ihdr.bpp() {
             24 => PixelType::U8x3,

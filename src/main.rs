@@ -11,7 +11,7 @@ fn main() {
     let config = Config {
         tilesize: 256,
         filename,
-        zoomlevel: 5,
+        zoomlevel: 6,
         folder: "out",
     };
 

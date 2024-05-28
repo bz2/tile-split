@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fast_image_resize = "^2.7.3"
+fast_image_resize = "^4.0.0"
 oxipng = { version="^9.0", default-features=false }
 rayon = "^1.8.0"
 
