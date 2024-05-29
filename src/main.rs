@@ -8,13 +8,14 @@ use std::str::FromStr;
 use std::{ops::RangeInclusive, path::Path};
 use tile_split::{Config, Error, TileImage};
 
-fn save_subimage(
+fn save_subimage_oxi(
     sub: &SubImage<&DynamicImage>,
     x: &u32,
     y: &u32,
     z: u8,
     folder: &Path,
     config: &Config,
+    preset: u8,
 ) -> Result<(), Error> {
     let path = folder.join(format!("{z}-{x}-{y}.png", z = z, x = x, y = y));
     let png = oxipng::RawImage::new(
@@ -24,9 +25,29 @@ fn save_subimage(
         oxipng::BitDepth::Eight,
         sub.to_image().into_raw(),
     )?
-    .create_optimized_png(&oxipng::Options::from_preset(2))?;
+    .create_optimized_png(&oxipng::Options::from_preset(preset))?;
     let mut file = File::create(path)?;
     file.write_all(&png)?;
+
+    Ok(())
+}
+
+fn save_subimage(
+    sub: &SubImage<&DynamicImage>,
+    x: &u32,
+    y: &u32,
+    z: u8,
+    folder: &Path,
+    format: &str,
+) -> Result<(), Error> {
+    let path = folder.join(format!(
+        "{z}-{x}-{y}.{fmt}",
+        z = z,
+        x = x,
+        y = y,
+        fmt = format
+    ));
+    sub.to_image().save(path)?;
 
     Ok(())
 }
@@ -79,6 +100,10 @@ struct Args {
     #[arg(short='t', long, required(false), value_parser = parse_range::<u32>)]
     targetrange: Option<RangeInclusive<u32>>,
 
+    /// PNG compression preset.
+    #[arg(long, env, default_value_if("tileformat", "png", "2"), value_parser(clap::value_parser!(u8).range(0..7)))]
+    preset: Option<u8>,
+
     /// Save the resized files
     #[arg(long, env, action)]
     save_resize: bool,
@@ -87,7 +112,13 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let save_resized = args.save_resize;
+    if args.preset.is_some() && &args.tileformat != "png" {
+        eprintln!(
+            "Error: The --preset argument cannot be used with --tileformat set to '{}'",
+            &args.tileformat
+        );
+        std::process::exit(2);
+    }
 
     // create output folder
     std::fs::create_dir_all(&args.output_dir).unwrap();
@@ -112,7 +143,7 @@ fn main() {
                 (image.resize(t_size, t_size), x)
             });
 
-    if save_resized {
+    if args.save_resize {
         resized_images
             .for_each(|(img, z)| save_image(&img, z, &args.output_dir, &args.tileformat).unwrap())
     } else {
@@ -139,7 +170,20 @@ fn main() {
                 .collect::<Vec<(SubImage<&DynamicImage>, u32, u32)>>()
                 .par_iter()
                 .for_each(|(sub_img, x, y)| {
-                    save_subimage(sub_img, x, y, z, &args.output_dir, &config).unwrap()
+                    if &args.tileformat == "png" {
+                        save_subimage_oxi(
+                            sub_img,
+                            x,
+                            y,
+                            z,
+                            &args.output_dir,
+                            &config,
+                            args.preset.unwrap(),
+                        )
+                        .unwrap()
+                    } else {
+                        save_subimage(sub_img, x, y, z, &args.output_dir, &args.tileformat).unwrap()
+                    }
                 });
         });
     }
