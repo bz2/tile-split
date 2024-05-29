@@ -1,16 +1,17 @@
 use clap::Parser;
 use image::{DynamicImage, ImageResult, SubImage};
+use rayon::prelude::*;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::{ops::RangeInclusive, path::Path};
-use tile_split::{Config, Error, Resizer, TileImage};
+use tile_split::{Config, Error, TileImage};
 
 fn save_subimage(
     sub: &SubImage<&DynamicImage>,
-    x: u32,
-    y: u32,
+    x: &u32,
+    y: &u32,
     z: u8,
     folder: &Path,
     config: &Config,
@@ -99,12 +100,17 @@ fn main() {
         args.targetrange,
     );
 
-    // instantiate TileImage
-    let tile_image = TileImage { config: &config };
-    let image = &tile_image.open_img().unwrap();
+    // instantiate and load image
+    let image = TileImage::new(&config);
 
     // resize (and save)
-    let resized_images = config.resize_range(image);
+    let resized_images =
+        RangeInclusive::new(config.startzoomrangetoslice, config.endzoomrangetoslice)
+            .into_par_iter()
+            .map(|x: u8| {
+                let t_size = config.tilesize << x;
+                (image.resize(t_size, t_size), x)
+            });
 
     if save_resized {
         resized_images
@@ -128,10 +134,12 @@ fn main() {
             } else if z == config.endzoomrangetoslice {
                 targetrangetoslice = Some(0..=config.endtargetrange);
             }
-            tile_image
-                .iter(&img, targetrangetoslice)
+            image
+                .iter_tiles(&img, targetrangetoslice)
+                .collect::<Vec<(SubImage<&DynamicImage>, u32, u32)>>()
+                .par_iter()
                 .for_each(|(sub_img, x, y)| {
-                    save_subimage(&sub_img, x, y, z, &args.output_dir, &config).unwrap()
+                    save_subimage(sub_img, x, y, z, &args.output_dir, &config).unwrap()
                 });
         });
     }
