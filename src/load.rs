@@ -2,13 +2,12 @@ use crate::{config, Error};
 use fast_image_resize::{Image, PixelType};
 use std::num::NonZeroU32;
 use std::path::Path;
-use std::sync::Arc;
 
 type ImageInfo = ((u32, u32), Vec<u8>, PixelType);
 
 #[cfg(feature = "image")]
 fn img_load_from_path(path: &Path) -> Result<ImageInfo, Error> {
-    let reader = image::io::Reader::open(path)?;
+    let mut reader = image::io::Reader::open(path)?;
     // Default memory limit may be too small for large images.
     reader.no_limits();
     let img = reader.decode()?;
@@ -26,7 +25,7 @@ fn oxi_load_from_path(path: &Path, options: &oxipng::Options) -> Result<ImageInf
     // compatibility guarantees at present, also not the most efficient.
     use oxipng::internal_tests::PngData;
 
-    let png = Arc::into_inner(PngData::new(path, options)?.raw).unwrap();
+    let png = std::sync::Arc::into_inner(PngData::new(path, options)?.raw).unwrap();
 
     Ok((
         (png.ihdr.width, png.ihdr.height),
