@@ -15,7 +15,6 @@ fn save_subimage_oxi(
     z: u8,
     folder: &Path,
     config: &Config,
-    options: &oxipng::Options,
 ) -> Result<(), Error> {
     let path = folder.join(format!("{z}-{x}-{y}.png", z = z, x = x, y = y));
     let png = oxipng::RawImage::new(
@@ -25,7 +24,10 @@ fn save_subimage_oxi(
         oxipng::BitDepth::Eight,
         sub.to_image().into_raw(),
     )?
-    .create_optimized_png(options)?;
+    .create_optimized_png(match &config.tileformat {
+        Format::OxiPng(opts) => &opts,
+        _ => unreachable!(),
+    })?;
     let mut file = File::create(path)?;
     file.write_all(&png)?;
 
@@ -140,16 +142,14 @@ fn main() {
             .iter_tiles(&img, targetrangetoslice)
             .collect::<Vec<(SubImage<&DynamicImage>, u32, u32)>>()
             .par_iter()
-            .for_each(|(sub_img, x, y)| {
-                // TODO: fix use-after-move for tileformat, can't copy options?
-                match &args.tileformat {
-                    Format::OxiPng(opts) => {
-                        save_subimage_oxi(sub_img, x, y, z, &args.output_dir, &config, &opts)
+            .try_for_each(|(sub_img, x, y)| {
+                match &config.tileformat {
+                    Format::OxiPng(_) => {
+                        save_subimage_oxi(sub_img, x, y, z, &args.output_dir, &config)
                     }
                     _ => save_subimage(sub_img, x, y, z, &args.output_dir, config.extension()),
                 }
-                .unwrap() // TODO: propogate error
-            });
+            }).expect("not all images processed");
     });
 }
 
